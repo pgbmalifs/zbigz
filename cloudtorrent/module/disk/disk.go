@@ -1,4 +1,4 @@
-package disk
+package diskModule
 
 import (
 	"encoding/json"
@@ -9,34 +9,44 @@ import (
 	"time"
 
 	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
+	"github.com/jpillora/cloud-torrent/cloudtorrent/module"
 	"github.com/jpillora/filenotify"
 	homedir "github.com/mitchellh/go-homedir"
-	"github.com/spf13/afero"
 )
 
-func New() fs.FS {
-	return &diskFS{
-		Fs: nil,
+//============================
+
+type factory struct{}
+
+func (f *factory) Type() string {
+	return "disk"
+}
+
+func (f *factory) New(id string) module.Module {
+	return &diskModule{
+		id: id,
 	}
 }
 
-type diskFS struct {
-	afero.Fs //already done!
-	watcher  filenotify.FileWatcher
-	config   struct {
+//============================
+
+type diskModule struct {
+	id      string
+	watcher filenotify.FileWatcher
+	config  struct {
 		Base string
 	}
 }
 
-func (d *diskFS) Name() string {
-	return "Disk"
+func (d *diskModule) ID() string {
+	return "disk:" + d.id
 }
 
-func (d *diskFS) Mode() fs.FSMode {
+func (d *diskModule) Mode() fs.FSMode {
 	return fs.RW
 }
 
-func (d *diskFS) Configure(raw json.RawMessage) (interface{}, error) {
+func (d *diskModule) Configure(raw json.RawMessage) (interface{}, error) {
 	if err := json.Unmarshal(raw, &d.config); err != nil {
 		return nil, err
 	}
@@ -60,12 +70,12 @@ func (d *diskFS) Configure(raw json.RawMessage) (interface{}, error) {
 	}
 	//ready!
 	d.config.Base = base
-	d.Fs = afero.NewBasePathFs(afero.NewOsFs(), base)
 	return &d.config, nil
 }
 
-func (d *diskFS) Update(chan fs.Node) error {
+func (d *diskModule) Sync(chan fs.Node) error {
 	d.watcher = filenotify.New()
+	defer d.watcher.Close()
 	//set poll interval (if polling is being used)
 	filenotify.SetPollInterval(d.watcher, time.Second)
 	d.watcher.Add(d.config.Base)

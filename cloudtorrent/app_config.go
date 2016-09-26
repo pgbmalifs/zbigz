@@ -3,13 +3,13 @@ package cloudtorrent
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"sort"
+	"strings"
 
-	"golang.org/x/net/context"
+	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
+	"github.com/jpillora/cloud-torrent/cloudtorrent/module"
 )
 
 type AppConfig struct {
@@ -17,31 +17,19 @@ type AppConfig struct {
 	Title      string
 }
 
-var EmptyConfig = json.RawMessage("{}")
-
-func (a *App) handleConfigure(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	cfgs := rawMessages{}
-	if err := json.NewDecoder(r.Body).Decode(&cfgs); err != nil {
-		return errors.New("JSON error")
-	}
-	if err := a.configureAll(cfgs); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (a *App) configureApp(raw json.RawMessage) (interface{}, error) {
+//App itself is also Configurable
+func (a *App) Configure(raw json.RawMessage) (interface{}, error) {
 	if err := json.Unmarshal(raw, &a.state.AppConfig); err != nil {
 		return nil, err
 	}
 	if a.state.AppConfig.Title == "" {
 		a.state.AppConfig.Title = "Cloud Torrent"
 	}
-	if a.state.AppConfig.User != "" || a.state.AppConfig.Pass != "" {
-		a.auth.SetUserPass(a.state.AppConfig.User, a.state.AppConfig.Pass)
-	}
+	a.auth.SetUserPass(a.state.AppConfig.User, a.state.AppConfig.Pass)
 	return &a.state.AppConfig, nil
 }
+
+var EmptyConfig = json.RawMessage("{}")
 
 func (a *App) configureAllRaw(b []byte) error {
 	cfgs := rawMessages{}
@@ -52,63 +40,74 @@ func (a *App) configureAllRaw(b []byte) error {
 }
 
 func (a *App) configureAll(cfgs rawMessages) error {
-	changed := false
-	for name, raw := range cfgs {
-		//normalize raw
-		indented := bytes.Buffer{}
-		if err := json.Indent(&indented, raw, "", "  "); err != nil {
-			panic(err)
-		}
-		r := indented.Bytes()
-		//check for fs
-		f, ok := a.fileSystems[name]
-		//validate name
-		if name != "App" && !ok {
-			continue
-		}
-		//compare to last update
-		prev := a.prevConfigs[name]
-		if bytes.Equal(prev, r) {
-			continue
-		}
-		//apply!
-		var v interface{}
-		var err error
-		if name == "App" {
-			v, err = a.configureApp(r)
-		} else {
-			v, err = f.Configure(r)
-		}
-		if err != nil {
-			if bytes.Equal(raw, EmptyConfig) {
-				continue
-			}
-			logf("[%s] configuration error: %s", name, err)
+	for id, raw := range cfgs {
+		if err := a.configureModule(id, raw); err != nil {
 			return err
 		}
-		//note successful configure
-		a.prevConfigs[name] = r
-		changed = true
-		if name == "App" {
-			//noop
-		} else if fsstate, ok := a.state.FSS[name]; ok {
-			fsstate.Config = v
-			//first config? start syncing filesystems
-			if !fsstate.Syncing {
-				fsstate.Syncing = true
-				fsstate.Push()
-				fsstate.Sync(f)
-			}
+	}
+	return nil
+}
+
+func (a *App) configureModule(typeid string, rawConfig json.RawMessage) error {
+	//normalize raw json
+	indented := bytes.Buffer{}
+	if err := json.Indent(&indented, rawConfig, "", "  "); err != nil {
+		panic(err)
+	}
+	config := indented.Bytes()
+	//check for existing module
+	m, ok := a.modules[typeid]
+	if !ok {
+		//doesn't exist, init using typeid
+		pair := strings.SplitN(typeid, ":", 2)
+		if len(pair) != 2 {
+			return fmt.Errorf("Invalid typeid  ('%s')", typeid)
 		}
+		typ := pair[0]
+		id := pair[1]
+		//lookup module registry
+		m = module.New(typ, id)
+		if m == nil {
+			return fmt.Errorf("Failed to initialise module ('%s:%s')", typ, id)
+		}
+		if t := m.TypeID(); typeid != t {
+			return fmt.Errorf("New module typeid mismatch ('%s' vs '%s')", typeid, t)
+		}
+		//initialise module
+		a.initModule(m)
 	}
-	if changed {
-		//write back to disk if changed
-		b, _ := json.MarshalIndent(&cfgs, "", "  ")
-		ioutil.WriteFile(a.ConfigPath, b, 0600)
-		//update frontend
-		a.state.Push()
-		logf("reconfigured")
+	//compare to last update
+	prev := a.configs[typeid]
+	if bytes.Equal(prev, config) {
+		return nil //skip, already have this config
 	}
+	//apply!
+	newConfig, err := m.Configure(config)
+	if err != nil {
+		if bytes.Equal(config, EmptyConfig) {
+			return nil //skip empty config errors
+		}
+		logf("[%s] configuration error: %s", typeid, err)
+		return err
+	}
+	//convert result
+	config, err = json.MarshalIndent(newConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %s (%s)", typeid, err)
+	}
+	//successful configure!
+	a.configs[typeid] = config
+	mstate := a.state.Modules[typeid]
+	mstate.Enabled = true
+	if fs, ok := m.(fs.FS); !mstate.Syncing && ok {
+		mstate.Syncing = true
+		mstate.Sync(fs)
+	}
+	mstate.Push()
+	//write back to disk if changed
+	b, _ := json.MarshalIndent(&a.configs, "", "  ")
+	ioutil.WriteFile(a.ConfigPath, b, 0600)
+	logf("reconfigured %s", typeid)
 	return nil
 }
 

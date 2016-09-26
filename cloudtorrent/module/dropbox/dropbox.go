@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"os"
 	"time"
 
 	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
@@ -11,7 +12,7 @@ import (
 )
 
 func New() fs.FS {
-	return &dropboxFS{
+	return &dropboxModule{
 		root: &file{
 			BaseNode: fs.BaseNode{
 				BaseInfo: fs.BaseInfo{
@@ -23,7 +24,8 @@ func New() fs.FS {
 	}
 }
 
-type dropboxFS struct {
+type dropboxModule struct {
+	id     string
 	client *dropbox.Client
 	config struct {
 		Token string
@@ -32,15 +34,15 @@ type dropboxFS struct {
 	root *file
 }
 
-func (d *dropboxFS) Name() string {
-	return "Dropbox"
+func (d *dropboxModule) TypeID() string {
+	return "dropbox:" + d.id
 }
 
-func (d *dropboxFS) Mode() fs.FSMode {
+func (d *dropboxModule) Mode() fs.FSMode {
 	return fs.RW
 }
 
-func (d *dropboxFS) Configure(raw json.RawMessage) (interface{}, error) {
+func (d *dropboxModule) Configure(raw json.RawMessage) (interface{}, error) {
 	if err := json.Unmarshal(raw, &d.config); err != nil {
 		return nil, err
 	}
@@ -49,13 +51,15 @@ func (d *dropboxFS) Configure(raw json.RawMessage) (interface{}, error) {
 		return nil, errors.New("API token missing")
 	}
 	if d.config.Base == "" {
-		d.config.Base = "/"
+		d.config.Base = string(os.PathSeparator)
 	}
 	d.client = dropbox.New(dropbox.NewConfig(d.config.Token))
+	logf("configured")
 	return &d.config, nil
 }
 
-func (d *dropboxFS) Update(updates chan fs.Node) error {
+func (d *dropboxModule) Sync(updates chan fs.Node) error {
+	logf("update...")
 	c := d.client
 	if c == nil {
 		return errors.New("API token was removed")
@@ -78,6 +82,7 @@ func (d *dropboxFS) Update(updates chan fs.Node) error {
 		}
 		//emit updates
 		if !resp.HasMore && emit {
+			logf("emit root")
 			updates <- d.root
 			emit = false
 		}
@@ -94,7 +99,7 @@ func (d *dropboxFS) Update(updates chan fs.Node) error {
 	}
 }
 
-func (d *dropboxFS) updateFile(m *dropbox.Metadata) bool {
+func (d *dropboxModule) updateFile(m *dropbox.Metadata) bool {
 	//node path
 	path := m.PathDisplay
 	//deletion
@@ -112,7 +117,7 @@ func (d *dropboxFS) updateFile(m *dropbox.Metadata) bool {
 			},
 		},
 	}
-	log.Printf("%+v", f)
+	logf("%+v", f)
 	//insert
 	return d.root.Upsert(path, f)
 }

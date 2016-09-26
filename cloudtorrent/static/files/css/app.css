@@ -11,10 +11,10 @@ html, body {
 }
 
 .cage {
-	padding-top: 10px;
+	padding-top: 20px;
 	padding-bottom: 40px;
 	max-width: 700px;
-	margin: 10px auto;
+	margin: 0 auto;
 }
 
 @media (max-width: 740px) {

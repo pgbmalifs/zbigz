@@ -2,7 +2,6 @@ package cloudtorrent
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,10 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
-	"github.com/jpillora/cloud-torrent/cloudtorrent/fs/disk"
-	"github.com/jpillora/cloud-torrent/cloudtorrent/fs/dropbox"
-	"github.com/jpillora/cloud-torrent/cloudtorrent/fs/torrent"
+	"github.com/jpillora/cloud-torrent/cloudtorrent/module"
+	"github.com/jpillora/cloud-torrent/cloudtorrent/module/torrent"
 	"github.com/jpillora/cloud-torrent/cloudtorrent/static"
 	"github.com/jpillora/cookieauth"
 	"github.com/jpillora/scraper/scraper"
@@ -36,23 +33,23 @@ type App struct {
 	CertPath   string `help:"TLS Certicate file path" short:"r"`
 	Log        bool   `help:"Enable request logging"`
 	Open       bool   `help:"Open now with your default browser"`
-	//internal state
+	//http internal state
 	files, static http.Handler
 	scraper       *scraper.Handler
 	scraperh      http.Handler
 	auth          *cookieauth.CookieAuth
-	fileSystems   map[string]fs.FS
-	prevConfigs   rawMessages
+	//module/config state
+	modules map[string]module.Module
+	configs rawMessages
 	//velox (browser) state
 	state struct {
 		velox.State
 		sync.Mutex
 		SearchProviders scraper.Config
 		AppConfig       AppConfig
-		FSS             map[string]*fs.State
+		Modules         map[string]*module.State
 		Users           map[string]time.Time
 		Stats           struct {
-			Title   string
 			Version string
 			Runtime string
 			Uptime  time.Time
@@ -67,45 +64,45 @@ func (a *App) Run(version string) error {
 	if tls && (a.CertPath == "" || a.KeyPath == "") {
 		return fmt.Errorf("You must provide both key and cert paths")
 	}
+	//internal state
+	a.modules = map[string]module.Module{}
 	//prepare initial empty configs
-	a.prevConfigs = rawMessages{}
-	cfgs := rawMessages{
-		"App": EmptyConfig,
-	}
+	a.configs = rawMessages{}
 	//system statistics
-	a.state.Stats.Title = a.Title
 	a.state.Stats.Version = version
 	a.state.Stats.Runtime = strings.TrimPrefix(runtime.Version(), "go")
 	a.state.Stats.Uptime = time.Now()
-	//app state
+	//browser sync state
 	a.state.AppConfig.Title = a.Title
 	if auth := strings.SplitN(a.Auth, ":", 2); len(auth) == 2 {
 		a.state.AppConfig.User = auth[0]
 		a.state.AppConfig.Pass = auth[1]
 	}
-	a.state.FSS = map[string]*fs.State{}
+	a.state.Modules = map[string]*module.State{}
 	a.state.Users = map[string]time.Time{}
-	//init filesystems
-	a.fileSystems = map[string]fs.FS{}
-	for _, f := range []fs.FS{
-		torrent.New(),
-		disk.New(),
-		dropbox.New(),
-	} {
-		n := f.Name()
-		if _, ok := a.fileSystems[n]; ok {
-			return errors.New("duplicate fs: " + n)
-		}
-		cfgs[n] = EmptyConfig
-		a.fileSystems[n] = f
-		a.state.FSS[n] = &fs.State{
-			Locker:  &a.state.Mutex,
-			Pusher:  &a.state.State,
-			Enabled: true,
-		}
-	}
+
+	// for _, f := range []fs.FS{}
+	//
+	// 	torrent.New(),
+	// 	disk.New(),
+	// 	dropbox.New(),
+	// } {
+	// 	n := f.Name()
+	// 	if _, ok := a.fileSystems[n]; ok {
+	// 		return errors.New("duplicate fs: " + n)
+	// 	}
+	// 	cfgs[n] = EmptyConfig
+	// 	a.fileSystems[n] = f
+	// 	a.state.FSS[n] = &fs.State{
+	// 		Locker:  &a.state.Mutex,
+	// 		Pusher:  &a.state.State,
+	// 		Enabled: true,
+	// 	}
+	// }
 	//app handlers
 	a.auth = cookieauth.New()
+	//DEBUG a.auth.SetLogger(log.New(os.Stdout, "", log.LstdFlags))
+
 	//static will use a the local static/ dir if it exists,
 	//otherwise will use the embedded files
 	a.static = static.FileSystemHandler()
@@ -116,7 +113,15 @@ func (a *App) Run(version string) error {
 	}
 	a.state.SearchProviders = a.scraper.Config //share scraper config
 	a.scraperh = http.StripPrefix("/search", a.scraper)
+	//default modules
+	a.initModule(a)
+	t := torrent.New()
+	a.initModule(t)
 	//configure
+	cfgs := rawMessages{}
+	//default config
+	cfgs[a.TypeID()] = EmptyConfig
+	cfgs[t.TypeID()] = EmptyConfig
 	if _, err := os.Stat(a.ConfigPath); err == nil {
 		if b, err := ioutil.ReadFile(a.ConfigPath); err != nil {
 			return fmt.Errorf("Read configurations error: %s", err)
@@ -159,6 +164,26 @@ func (a *App) Run(version string) error {
 	} else {
 		return http.ListenAndServe(addr, h)
 	}
+}
+
+func (a *App) initModule(m module.Module) {
+	typeid := m.TypeID()
+	_, ok := a.modules[typeid]
+	if ok {
+		panic("module already initialised: " + typeid)
+	}
+
+	a.modules[typeid] = m
+	a.state.Modules[typeid] = &module.State{
+		TypeID: typeid,
+		Locker: &a.state,
+		Pusher: &a.state,
+	}
+
+}
+
+func (a *App) TypeID() string {
+	return "app" //singleton
 }
 
 func logf(format string, args ...interface{}) {

@@ -1,7 +1,7 @@
 <html ng-app="app" >
 	<head>
-		<title ng-bind="state.Configurations.App.Title">Cloud Torrent</title>
-    	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<title ng-bind="state.AppConfig.Title">Cloud Torrent</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<link rel="stylesheet" type="text/css" href="css/Lato/Lato.css">
 		<link rel="stylesheet" type="text/css" href="css/semantic.min.css">
 		<link rel="stylesheet" type="text/css" href="css/app.css">
@@ -9,7 +9,7 @@
 		<style type="text/css">[ng-cloak]{display: none;}</style>
 	</head>
 	<body class="app"><div ng-cloak class="cage">
-	<!-- DISCONNECTION WARNING ========= -->
+		<!-- DISCONNECTION WARNING ========= -->
 		<div ng-if="!connected" class="connect-warning ui inverted vertical masthead center aligned segment">
 			<div class="ui text container">
 				<h1 class="ui inverted header">
@@ -28,7 +28,7 @@
 					ng-init="logoHover = false"
 					ng-mouseover="logoHover = true"
 					ng-mouseleave="logoHover = false">
-					<i class="blue icon" ng-class="{cloud:!logoHover, github: logoHover}"></i>  {{ logoHover ? 'Cloud Torrent' : state.Configurations.App.Title }}
+					<i class="blue icon" ng-class="{cloud:!logoHover, github: logoHover}"></i>  {{ logoHover ? 'Cloud Torrent' : state.AppConfig.Title }}
 				</a>
 			</h2>
 			<div class="status">
@@ -56,9 +56,12 @@
 			</screen>
 			<screen ng-switch-when="home">
 				<section class="omni" ng-controller="OmniController" ng-include src="'template/omni.html'"></section>
+				<!--
 				<section class="torrents" ng-controller="TorrentsController" ng-include src="'template/torrents.html'"></section>
 				<section class="downloads" ng-controller="DownloadsController" ng-include src="'template/downloads.html'"></section>
+				  -->
 			</screen>
+			<!-- TODO rss feed editor screen -->
 		</screens>
 		<!-- FOOTER ===================== -->
 		<footer>

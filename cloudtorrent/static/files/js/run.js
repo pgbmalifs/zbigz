@@ -3,18 +3,18 @@
 //RootController
 app.run(function($rootScope, search, api) {
 
-  var $scope = window.scope = $rootScope;
+  var $scope = window.ct = $rootScope;
 
   //link up to angular
   $scope.state = {};
-  // var v = $scope.v = velox.sse("/sync", $scope.state);
-  // v.onconnect = v.ondisconnect = function() {
-  //   $scope.connected = v.connected;
-  //   $scope.$apply();
-  // };
-  // v.onupdate = function() {
-  //   $scope.$apply();
-  // };
+  var v = $scope.v = velox.sse("/sync", $scope.state);
+  v.onconnect = v.ondisconnect = function() {
+    $scope.connected = v.connected;
+    $scope.$applyAsync();
+  };
+  v.onupdate = function() {
+    $scope.$applyAsync();
+  };
 
   //prepare screen
   $scope.screen = 'home';

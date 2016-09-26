@@ -8,14 +8,15 @@ import (
 	"time"
 
 	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
+	"github.com/jpillora/cloud-torrent/cloudtorrent/module"
 	"github.com/spf13/afero"
 )
 
-func New() fs.FS {
-	return &torrentFS{}
+func New() module.Module {
+	return &torrentModule{}
 }
 
-type torrentFS struct {
+type torrentModule struct {
 	config struct {
 		PeerID            string
 		DownloadDirectory string
@@ -27,15 +28,15 @@ type torrentFS struct {
 	}
 }
 
-func (t *torrentFS) Name() string {
-	return "Torrents"
+func (t *torrentModule) TypeID() string {
+	return "torrent" //singleton
 }
 
-func (t *torrentFS) Mode() fs.FSMode {
+func (t *torrentModule) Mode() fs.FSMode {
 	return fs.RW
 }
 
-func (t *torrentFS) Configure(raw json.RawMessage) (interface{}, error) {
+func (t *torrentModule) Configure(raw json.RawMessage) (interface{}, error) {
 	if err := json.Unmarshal(raw, &t.config); err != nil {
 		return nil, err
 	}
@@ -54,51 +55,51 @@ func (t *torrentFS) Configure(raw json.RawMessage) (interface{}, error) {
 	return &t.config, nil
 }
 
-func (t *torrentFS) Update(chan fs.Node) error {
+func (t *torrentModule) Update(chan fs.Node) error {
 	return nil
 }
 
-func (t *torrentFS) Create(name string) (afero.File, error) {
+func (t *torrentModule) Create(name string) (afero.File, error) {
 	return &file{}, nil
 }
 
-func (t *torrentFS) Open(name string) (afero.File, error) {
+func (t *torrentModule) Open(name string) (afero.File, error) {
 	return &file{}, nil
 }
 
-func (t *torrentFS) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
+func (t *torrentModule) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
 	return t.Open(name)
 }
 
-func (t *torrentFS) Mkdir(name string, perm os.FileMode) error {
+func (t *torrentModule) Mkdir(name string, perm os.FileMode) error {
 	return errors.New("not supported yet")
 }
 
-func (t *torrentFS) MkdirAll(path string, perm os.FileMode) error {
+func (t *torrentModule) MkdirAll(path string, perm os.FileMode) error {
 	return errors.New("not supported yet")
 }
 
-func (t *torrentFS) Remove(name string) error {
+func (t *torrentModule) Remove(name string) error {
 	return errors.New("not supported yet")
 }
 
-func (t *torrentFS) RemoveAll(path string) error {
+func (t *torrentModule) RemoveAll(path string) error {
 	return errors.New("not supported yet")
 }
 
-func (t *torrentFS) Rename(oldname, newname string) error {
+func (t *torrentModule) Rename(oldname, newname string) error {
 	return errors.New("not supported yet")
 }
 
-func (t *torrentFS) Stat(name string) (os.FileInfo, error) {
+func (t *torrentModule) Stat(name string) (os.FileInfo, error) {
 	return nil, errors.New("not supported yet")
 }
 
-func (t *torrentFS) Chmod(name string, mode os.FileMode) error {
+func (t *torrentModule) Chmod(name string, mode os.FileMode) error {
 	return errors.New("not supported yet")
 }
 
-func (t *torrentFS) Chtimes(name string, atime time.Time, mtime time.Time) error {
+func (t *torrentModule) Chtimes(name string, atime time.Time, mtime time.Time) error {
 	return errors.New("not supported yet")
 }
 

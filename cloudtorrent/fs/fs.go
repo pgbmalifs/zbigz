@@ -1,7 +1,5 @@
 package fs
 
-import "encoding/json"
-
 type FSMode int
 
 const (
@@ -11,8 +9,6 @@ const (
 )
 
 type FS interface {
-	Name() string
 	Mode() FSMode
-	Configure(json.RawMessage) (interface{}, error)
-	Update(chan Node) error
+	Sync(chan Node) error
 }
