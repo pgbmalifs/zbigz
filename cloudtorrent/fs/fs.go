@@ -1,14 +1,15 @@
 package fs
 
-type FSMode int
+import "io"
 
-const (
-	R  FSMode = 1 << 0
-	W         = 1 << 1
-	RW        = R | W
-)
+type ReadableFS interface {
+	ReadStream(path string) (io.ReadCloser, error)
+}
+
+type WritableFS interface {
+	WriteStream(path string) (io.WriteCloser, error)
+}
 
 type FS interface {
-	Mode() FSMode
 	Sync(chan Node) error
 }

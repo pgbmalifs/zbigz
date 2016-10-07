@@ -1,4 +1,4 @@
-package diskModule
+package disk
 
 import (
 	"encoding/json"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
 	"github.com/jpillora/cloud-torrent/cloudtorrent/module"
-	"github.com/jpillora/filenotify"
 	homedir "github.com/mitchellh/go-homedir"
 )
 
@@ -23,30 +22,38 @@ func (f *factory) Type() string {
 }
 
 func (f *factory) New(id string) module.Module {
-	return &diskModule{
+	m := &diskModule{
 		id: id,
 	}
+	return m
+}
+
+func init() {
+	module.Register(&factory{})
+}
+
+//============================
+
+type file struct {
+	fs.BaseNode
 }
 
 //============================
 
 type diskModule struct {
-	id      string
-	watcher filenotify.FileWatcher
-	config  struct {
+	id     string
+	root   *file
+	config struct {
 		Base string
 	}
 }
 
-func (d *diskModule) ID() string {
+func (d *diskModule) TypeID() string {
 	return "disk:" + d.id
 }
 
-func (d *diskModule) Mode() fs.FSMode {
-	return fs.RW
-}
-
 func (d *diskModule) Configure(raw json.RawMessage) (interface{}, error) {
+	prevBase := d.config.Base
 	if err := json.Unmarshal(raw, &d.config); err != nil {
 		return nil, err
 	}
@@ -68,23 +75,35 @@ func (d *diskModule) Configure(raw json.RawMessage) (interface{}, error) {
 	} else if !info.IsDir() {
 		return nil, errors.New("Path is not a directory")
 	}
+	//base dir changed
+	if prevBase != base {
+		// d.logf("watching %s for file changes", base)
+	}
 	//ready!
 	d.config.Base = base
 	return &d.config, nil
 }
 
-func (d *diskModule) Sync(chan fs.Node) error {
-	d.watcher = filenotify.New()
-	defer d.watcher.Close()
-	//set poll interval (if polling is being used)
-	filenotify.SetPollInterval(d.watcher, time.Second)
-	d.watcher.Add(d.config.Base)
-	for event := range d.watcher.Events() {
-		log.Printf("event %+v", event)
+func (d *diskModule) Sync(updates chan fs.Node) error {
+	d.root = &file{
+		BaseNode: fs.BaseNode{
+			BaseInfo: fs.BaseInfo{
+				Name:  "/",
+				IsDir: true,
+			},
+		},
 	}
+	if info, err := os.Stat(d.config.Base); err == nil {
+		n := int64(0)
+		if err := walk(&d.root.BaseNode, d.config.Base, info, &n); err != nil {
+			return err
+		}
+	}
+	updates <- d.root
+	time.Sleep(60 * time.Second)
 	return nil
 }
 
-func logf(format string, args ...interface{}) {
-	log.Printf("[Disk] "+format, args...)
+func (d *diskModule) logf(format string, args ...interface{}) {
+	log.Printf("[Disk:"+d.id+"] "+format, args...)
 }

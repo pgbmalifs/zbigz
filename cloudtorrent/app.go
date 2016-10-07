@@ -19,6 +19,10 @@ import (
 	"github.com/jpillora/scraper/scraper"
 	"github.com/jpillora/velox"
 	"github.com/skratchdot/open-golang/open"
+
+	//manual import to register extra modules
+	_ "github.com/jpillora/cloud-torrent/cloudtorrent/module/disk"
+	_ "github.com/jpillora/cloud-torrent/cloudtorrent/module/dropbox"
 )
 
 //App is the core cloudtorrent application
@@ -33,6 +37,8 @@ type App struct {
 	CertPath   string `help:"TLS Certicate file path" short:"r"`
 	Log        bool   `help:"Enable request logging"`
 	Open       bool   `help:"Open now with your default browser"`
+	//app state
+	appConfig AppConfig
 	//http internal state
 	files, static http.Handler
 	scraper       *scraper.Handler
@@ -46,7 +52,6 @@ type App struct {
 		velox.State
 		sync.Mutex
 		SearchProviders scraper.Config
-		AppConfig       AppConfig
 		Modules         map[string]*module.State
 		Users           map[string]time.Time
 		Stats           struct {
@@ -73,32 +78,13 @@ func (a *App) Run(version string) error {
 	a.state.Stats.Runtime = strings.TrimPrefix(runtime.Version(), "go")
 	a.state.Stats.Uptime = time.Now()
 	//browser sync state
-	a.state.AppConfig.Title = a.Title
+	a.appConfig.Title = a.Title
 	if auth := strings.SplitN(a.Auth, ":", 2); len(auth) == 2 {
-		a.state.AppConfig.User = auth[0]
-		a.state.AppConfig.Pass = auth[1]
+		a.appConfig.User = auth[0]
+		a.appConfig.Pass = auth[1]
 	}
 	a.state.Modules = map[string]*module.State{}
 	a.state.Users = map[string]time.Time{}
-
-	// for _, f := range []fs.FS{}
-	//
-	// 	torrent.New(),
-	// 	disk.New(),
-	// 	dropbox.New(),
-	// } {
-	// 	n := f.Name()
-	// 	if _, ok := a.fileSystems[n]; ok {
-	// 		return errors.New("duplicate fs: " + n)
-	// 	}
-	// 	cfgs[n] = EmptyConfig
-	// 	a.fileSystems[n] = f
-	// 	a.state.FSS[n] = &fs.State{
-	// 		Locker:  &a.state.Mutex,
-	// 		Pusher:  &a.state.State,
-	// 		Enabled: true,
-	// 	}
-	// }
 	//app handlers
 	a.auth = cookieauth.New()
 	//DEBUG a.auth.SetLogger(log.New(os.Stdout, "", log.LstdFlags))
@@ -117,11 +103,11 @@ func (a *App) Run(version string) error {
 	a.initModule(a)
 	t := torrent.New()
 	a.initModule(t)
-	//configure
-	cfgs := rawMessages{}
 	//default config
-	cfgs[a.TypeID()] = EmptyConfig
-	cfgs[t.TypeID()] = EmptyConfig
+	cfgs := rawMessages{
+		a.TypeID(): EmptyConfig,
+		t.TypeID(): EmptyConfig,
+	}
 	if _, err := os.Stat(a.ConfigPath); err == nil {
 		if b, err := ioutil.ReadFile(a.ConfigPath); err != nil {
 			return fmt.Errorf("Read configurations error: %s", err)
@@ -146,12 +132,12 @@ func (a *App) Run(version string) error {
 		proto += "s"
 	}
 	if a.Open {
-		h := host
-		if h == "0.0.0.0" {
-			h = "localhost"
-		}
 		go func() {
 			time.Sleep(1 * time.Second)
+			h := host
+			if h == "0.0.0.0" {
+				h = "localhost"
+			}
 			open.Run(fmt.Sprintf("%s://%s:%d", proto, h, a.Port))
 		}()
 	}
@@ -172,14 +158,12 @@ func (a *App) initModule(m module.Module) {
 	if ok {
 		panic("module already initialised: " + typeid)
 	}
-
 	a.modules[typeid] = m
 	a.state.Modules[typeid] = &module.State{
 		TypeID: typeid,
 		Locker: &a.state,
 		Pusher: &a.state,
 	}
-
 }
 
 func (a *App) TypeID() string {

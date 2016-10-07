@@ -28,8 +28,8 @@ func NewBaseNode(name string) *BaseNode {
 }
 
 type BaseNode struct {
-	Children map[string]Node
 	BaseInfo
+	Children map[string]Node
 }
 
 func (b *BaseNode) childmap() map[string]Node {
@@ -57,16 +57,13 @@ func (n *BaseNode) get(path string, mkdirp bool) (node Node, parent Node) {
 			parent.Upsert(pname, b)
 			parent = b
 		} else {
+			//missing and cant mkdir
 			return nil, nil
 		}
 	}
 	m := childmap(parent)
 	//get child and parent node
-	c := m[name]
-	if c != nil {
-	} else {
-	}
-	return c, parent
+	return m[name], parent
 }
 
 func (n *BaseNode) Get(path string) Node {
@@ -117,8 +114,8 @@ func (n *BaseNode) ToMap() map[string]interface{} {
 	if !n.MTime.IsZero() {
 		m["MTime"] = n.BaseInfo.MTime
 	}
-	if c := n.GetChildren(); len(c) > 0 {
-		m["Children"] = c
+	if len(n.Children) > 0 {
+		m["Children"] = n.Children
 	}
 	return m
 }

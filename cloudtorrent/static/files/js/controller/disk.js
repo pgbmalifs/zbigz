@@ -1,13 +1,10 @@
 /* globals app */
 
-app.controller("DownloadsController", function($scope, $rootScope) {
-  $rootScope.downloads = $scope;
-
-  $scope.numDownloads = function() {
-    if($scope.state.Downloads && $scope.state.Downloads.Children)
-      return $scope.state.Downloads.Children.length;
-    return 0;
+app.controller("DiskController", function($scope, $rootScope) {
+  $scope.hasDownloads = function() {
+    return $scope.disk.Root && !!$scope.disk.Root.Children;
   };
+  console.log($scope.disk, $scope.hasDownloads());
 });
 
 app.controller("NodeController", function($scope, $rootScope, $http, $timeout) {
@@ -84,6 +81,9 @@ app.controller("NodeController", function($scope, $rootScope, $http, $timeout) {
   };
 
   $scope.remove = function() {
-    $http.delete("/download/" + n.$path);
+    $scope.deleting = true;
+    $http.delete("/download/" + n.$path).finally(function() {
+      $scope.deleting = false;
+    });
   };
 });

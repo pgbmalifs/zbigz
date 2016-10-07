@@ -1,13 +1,10 @@
-<h3 class="ui header">Downloads</h3>
+<!-- <h3 class="ui header">Downloads</h3> -->
 
-<div ng-if="numDownloads() == 0" class="ui message nodownloads">
-  <p>Download files above</p>
-</div>
-
-<div ng-if="numDownloads() > 0" class="ui segment">
-  <div class="ui list">
-    <div class="item" ng-repeat="node in state.Downloads.Children"
-        ng-controller="NodeController"
-        ng-include src="'template/download-tree.html'"></div>
-  </div>
+<div class="ui segment">
+	<p ng-if="hasDownloads() == 0">Download files above</p>
+	<div class="ui list" ng-if="hasDownloads() > 0">
+		<div class="item" ng-repeat="(name,node) in disk.Root.Children"
+				ng-controller="NodeController"
+				ng-include src="'template/download-tree.html'"></div>
+	</div>
 </div>

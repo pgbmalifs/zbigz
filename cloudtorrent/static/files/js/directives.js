@@ -1,5 +1,28 @@
 /* globals app */
 
+app.directive('ngEnter', function() {
+  return function(scope, element, attrs) {
+    element.bind("keydown keypress", function(event) {
+      if (event.which === 13) {
+        scope.$apply(function() {
+          scope.$eval(attrs.ngEnter);
+        });
+        event.preventDefault();
+      }
+    });
+  };
+});
+
+//TODO remove this hack
+app.directive('jpSrc', function() {
+  return function(scope, element, attrs) {
+    scope.$watch(attrs.jpSrc, function(src) {
+      element.attr("src", src);
+    });
+  };
+});
+
+//semantic-checkbox
 app.directive('checkbox', function() {
   return {
     restrict: 'E',

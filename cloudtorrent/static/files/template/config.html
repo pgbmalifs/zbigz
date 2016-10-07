@@ -6,17 +6,17 @@
 			<div class="column">
 				<div class="field">
 					<label>Username</label>
-					<input type="text" ng-model="inputs.App.User"></input>
+					<input type="text" ng-model="inputs.app.User"></input>
 				</div>
 				<div class="field">
 					<label>Password</label>
-					<input type="password" ng-model="inputs.App.Pass"></input>
+					<input type="password" ng-model="inputs.app.Pass"></input>
 				</div>
 			</div>
 			<div class="column">
 				<div class="field">
 					<label>Title</label>
-					<input type="text" ng-model="inputs.App.Title"></input>
+					<input type="text" ng-model="inputs.app.Title"></input>
 				</div>
 			</div>
 		</div>
@@ -28,46 +28,60 @@
 			<div class="column">
 				<div class="field">
 					<label>Peer ID</label>
-					<input type="text" ng-model="inputs.Torrents.PeerID"></input>
+					<input type="text" ng-model="inputs.torrent.PeerID"></input>
 				</div>
 				<div class="field">
 					<label>Incoming connections port</label>
-					<input type="number" min="1" max="65535" ng-model="inputs.Torrents.IncomingPort"></input>
+					<input type="number" min="1" max="65535" ng-model="inputs.torrent.IncomingPort"></input>
 				</div>
 			</div>
 			<div class="column">
 				<div class="ui basic segment">
 					<div class="field">
-						<checkbox type="toggle" ng-model="inputs.Torrents.AutoStart">Auto start torrents</checkbox><br>
+						<checkbox type="toggle" ng-model="inputs.torrent.AutoStart">Auto start torrents</checkbox><br>
 					</div>
 					<div class="field">
-						<checkbox type="toggle" ng-model="inputs.Torrents.EnableEncryption">Enable encryption</checkbox><br>
+						<checkbox type="toggle" ng-model="inputs.torrent.EnableEncryption">Enable encryption</checkbox><br>
 					</div>
 					<div class="field">
-						<checkbox type="toggle" ng-model="inputs.Torrents.EnableUpload">Enable uploading</checkbox><br>
+						<checkbox type="toggle" ng-model="inputs.torrent.EnableUpload">Enable uploading</checkbox><br>
 					</div>
 					<div class="field">
-						<checkbox type="toggle" ng-model="inputs.Torrents.EnableSeeding">Enable seeding</checkbox><br>
+						<checkbox type="toggle" ng-model="inputs.torrent.EnableSeeding">Enable seeding</checkbox><br>
 					</div>
 				</div>
 			</div>
 		</div>
 	</div>
 	<!-- ================================== -->
-	<h4 class="ui dividing header">Disk</h4>
-	<div class="field">
-		<label>Storage path</label>
-		<input type="text" ng-model="inputs.Disk.Base"></input>
+	<h4 class="ui module dividing header">
+		Disk
+		<div class="ui tiny green add button" ng-click="add('disk')">
+			Add  <i class="plus icon"></i>
+		</div>
+	</h4>
+	<div class="ui segment" ng-repeat="disk in list('disk')">
+		<div class="field">
+			<label>Storage path</label>
+			<input type="text" ng-model="disk.Base" placeholder="/"></input>
+		</div>
 	</div>
 	<!-- ================================== -->
-	<h4 class="ui dividing header">Dropbox</h4>
-	<div class="field">
-		<label>API Token</label>
-		<input type="text" ng-model="inputs.Dropbox.Token"></input>
-	</div>
-	<div class="field">
-		<label>Storage path</label>
-		<input type="text" ng-model="inputs.Dropbox.Base"></input>
+	<h4 class="ui module dividing header">
+		Dropbox
+		<div class="ui tiny green add button" ng-click="add('dropbox')">
+			Add  <i class="plus icon"></i>
+		</div>
+	</h4>
+	<div class="ui segment" ng-repeat="dropbox in list('dropbox')">
+		<div class="field">
+			<label>API Token</label>
+			<input type="text" ng-model="dropbox.Token" placeholder="abcXYZ"></input>
+		</div>
+		<div class="field">
+			<label>Storage path</label>
+			<input type="text" ng-model="dropbox.Base" placeholder="/"></input>
+		</div>
 	</div>
 	<!-- ================================== -->
 	<div class="buttons">

@@ -8,9 +8,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
 	"github.com/jpillora/cloud-torrent/cloudtorrent/module"
 )
+
+var EmptyConfig = json.RawMessage("{}")
 
 type AppConfig struct {
 	User, Pass string
@@ -19,17 +20,15 @@ type AppConfig struct {
 
 //App itself is also Configurable
 func (a *App) Configure(raw json.RawMessage) (interface{}, error) {
-	if err := json.Unmarshal(raw, &a.state.AppConfig); err != nil {
+	if err := json.Unmarshal(raw, &a.appConfig); err != nil {
 		return nil, err
 	}
-	if a.state.AppConfig.Title == "" {
-		a.state.AppConfig.Title = "Cloud Torrent"
+	if a.appConfig.Title == "" {
+		a.appConfig.Title = "Cloud Torrent"
 	}
-	a.auth.SetUserPass(a.state.AppConfig.User, a.state.AppConfig.Pass)
-	return &a.state.AppConfig, nil
+	a.auth.SetUserPass(a.appConfig.User, a.appConfig.Pass)
+	return &a.appConfig, nil
 }
-
-var EmptyConfig = json.RawMessage("{}")
 
 func (a *App) configureAllRaw(b []byte) error {
 	cfgs := rawMessages{}
@@ -51,14 +50,15 @@ func (a *App) configureAll(cfgs rawMessages) error {
 func (a *App) configureModule(typeid string, rawConfig json.RawMessage) error {
 	//normalize raw json
 	indented := bytes.Buffer{}
-	if err := json.Indent(&indented, rawConfig, "", "  "); err != nil {
-		panic(err)
+	err := json.Indent(&indented, rawConfig, "", "  ")
+	if err != nil {
+		return err
 	}
 	config := indented.Bytes()
 	//check for existing module
 	m, ok := a.modules[typeid]
 	if !ok {
-		//doesn't exist, init using typeid
+		//doesn't exist, init using type:id
 		pair := strings.SplitN(typeid, ":", 2)
 		if len(pair) != 2 {
 			return fmt.Errorf("Invalid typeid  ('%s')", typeid)
@@ -66,9 +66,9 @@ func (a *App) configureModule(typeid string, rawConfig json.RawMessage) error {
 		typ := pair[0]
 		id := pair[1]
 		//lookup module registry
-		m = module.New(typ, id)
-		if m == nil {
-			return fmt.Errorf("Failed to initialise module ('%s:%s')", typ, id)
+		m, err = module.New(typ, id)
+		if err != nil {
+			return err
 		}
 		if t := m.TypeID(); typeid != t {
 			return fmt.Errorf("New module typeid mismatch ('%s' vs '%s')", typeid, t)
@@ -98,11 +98,15 @@ func (a *App) configureModule(typeid string, rawConfig json.RawMessage) error {
 	//successful configure!
 	a.configs[typeid] = config
 	mstate := a.state.Modules[typeid]
-	mstate.Enabled = true
-	if fs, ok := m.(fs.FS); !mstate.Syncing && ok {
-		mstate.Syncing = true
-		mstate.Sync(fs)
+	if !mstate.Enabled {
+		mstate.Sync(m)
+		mstate.Lock()
+		mstate.Enabled = true
+		mstate.Unlock()
 	}
+	mstate.Lock()
+	mstate.Config = newConfig
+	mstate.Unlock()
 	mstate.Push()
 	//write back to disk if changed
 	b, _ := json.MarshalIndent(&a.configs, "", "  ")

@@ -8,11 +8,21 @@ import (
 	"time"
 
 	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
+	"github.com/jpillora/cloud-torrent/cloudtorrent/module"
 	dropbox "github.com/tj/go-dropbox"
 )
 
-func New() fs.FS {
+//============================
+
+type factory struct{}
+
+func (f *factory) Type() string {
+	return "dropbox"
+}
+
+func (f *factory) New(id string) module.Module {
 	return &dropboxModule{
+		id: id,
 		root: &file{
 			BaseNode: fs.BaseNode{
 				BaseInfo: fs.BaseInfo{
@@ -23,6 +33,12 @@ func New() fs.FS {
 		},
 	}
 }
+
+func init() {
+	module.Register(&factory{})
+}
+
+//============================
 
 type dropboxModule struct {
 	id     string
@@ -36,10 +52,6 @@ type dropboxModule struct {
 
 func (d *dropboxModule) TypeID() string {
 	return "dropbox:" + d.id
-}
-
-func (d *dropboxModule) Mode() fs.FSMode {
-	return fs.RW
 }
 
 func (d *dropboxModule) Configure(raw json.RawMessage) (interface{}, error) {

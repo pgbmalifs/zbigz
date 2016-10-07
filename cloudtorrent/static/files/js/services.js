@@ -1,6 +1,6 @@
 /* globals app,window */
 
-app.factory('api', function($rootScope, $http, reqerr) {
+app.service('api', function($rootScope, $http, reqerr) {
   window.http = $http;
   var request = function(action, data) {
     var url = "/api/"+action;
@@ -17,7 +17,7 @@ app.factory('api', function($rootScope, $http, reqerr) {
   return api;
 });
 
-app.factory('search', function($rootScope, $http, reqerr) {
+app.service('search', function($rootScope, $http, reqerr) {
   return {
     all: function(provider, query, page) {
       var params = {query:query};
@@ -43,42 +43,33 @@ app.factory('search', function($rootScope, $http, reqerr) {
   };
 });
 
-app.factory('storage', function() {
+app.service('storage', function() {
   return window.localStorage || {};
 });
 
-app.factory('reqerr', function() {
+app.service('hash', function() {
+  return function(obj) {
+    return JSON.stringify(obj, function(k,v) {
+      return k.charAt(0) === "$" ? undefined : v;
+    });
+  };
+});
+
+app.service('reqerr', function() {
   return function(err, status) {
     alert(err.error || err);
     console.error("request error '%s' (%s)", err, status);
   };
 });
 
-app.filter('keys', function() {
-  return Object.keys;
-});
-
-app.filter('addspaces', function() {
-  return function(s) {
-    if(typeof s !== "string")
-      return s;
-    return s.replace(/([A-Z]+[a-z]*)/g, function(_, word) {
-      return " " + word;
-    }).replace(/^\ /, "");
+app.service('hexid', function() {
+  var N = 12;
+  return function() {
+    return Array(N+1).join((Math.random().toString(16)+'00000000000000000').slice(2, 18)).slice(0, N);
   };
 });
 
-app.filter('filename', function() {
-  return function(path) {
-    return (/\/([^\/]+)$/).test(path) ? RegExp.$1 : path;
-  };
-});
-
-app.filter('bytes', function(bytes) {
-  return bytes;
-});
-
-app.factory('bytes', function() {
+app.service('bytes', function() {
   var scale = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   return function(n) {
     var i = 0;
@@ -91,27 +82,5 @@ app.factory('bytes', function() {
       n = Math.round(n / 100) / 10;
     }
     return "" + n + " " + s;
-  };
-});
-
-app.directive('ngEnter', function() {
-  return function(scope, element, attrs) {
-    element.bind("keydown keypress", function(event) {
-      if (event.which === 13) {
-        scope.$apply(function() {
-          scope.$eval(attrs.ngEnter);
-        });
-        event.preventDefault();
-      }
-    });
-  };
-});
-
-//TODO remove this hack
-app.directive('jpSrc', function() {
-  return function(scope, element, attrs) {
-    scope.$watch(attrs.jpSrc, function(src) {
-      element.attr("src", src);
-    });
   };
 });

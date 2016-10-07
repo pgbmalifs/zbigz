@@ -2,18 +2,20 @@ package torrent
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"log"
-	"os"
+	"net/http"
 	"time"
 
+	"github.com/anacrolix/torrent"
 	"github.com/jpillora/cloud-torrent/cloudtorrent/fs"
 	"github.com/jpillora/cloud-torrent/cloudtorrent/module"
-	"github.com/spf13/afero"
 )
 
 func New() module.Module {
-	return &torrentModule{}
+	m := &torrentModule{}
+	m.setupRoutes()
+	return m
 }
 
 type torrentModule struct {
@@ -26,81 +28,70 @@ type torrentModule struct {
 		AutoStart         bool
 		IncomingPort      int
 	}
+	client *torrent.Client
+	router http.Handler
 }
 
 func (t *torrentModule) TypeID() string {
 	return "torrent" //singleton
 }
 
-func (t *torrentModule) Mode() fs.FSMode {
-	return fs.RW
-}
-
 func (t *torrentModule) Configure(raw json.RawMessage) (interface{}, error) {
-	if err := json.Unmarshal(raw, &t.config); err != nil {
+	err := json.Unmarshal(raw, &t.config)
+	if err != nil {
 		return nil, err
 	}
 	unset := t.config.PeerID == "" && t.config.IncomingPort == 0
 	if t.config.PeerID == "" {
-		t.config.PeerID = "Cloud Torrent"
+		t.config.PeerID = "Cloud-Torrent"
+	}
+	//must be 20 chars
+	for len(t.config.PeerID) < 20 {
+		t.config.PeerID += " "
+	}
+	if len(t.config.PeerID) > 20 {
+		t.config.PeerID = t.config.PeerID[:20]
 	}
 	if t.config.IncomingPort == 0 {
-		t.config.IncomingPort = 4479
+		t.config.IncomingPort = 50007
 	}
 	if unset {
 		t.config.EnableEncryption = true
 		t.config.EnableSeeding = true
 		t.config.EnableUpload = true
 	}
+	//close previous client
+	if t.client != nil {
+		t.client.Close()
+	}
+	//convert cloud-torrent config into anacrolix/torrent config
+	t.client, err = torrent.NewClient(&torrent.Config{
+		PeerID:            t.config.PeerID,
+		NoUpload:          !t.config.EnableUpload,
+		Seed:              t.config.EnableSeeding,
+		DisableEncryption: !t.config.EnableEncryption,
+		ListenAddr:        fmt.Sprintf(":%d", t.config.IncomingPort),
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &t.config, nil
 }
 
-func (t *torrentModule) Update(chan fs.Node) error {
-	return nil
+func (t *torrentModule) Sync(updates chan fs.Node) error {
+	for {
+		updates <- t.sync()
+		time.Sleep(1 * time.Second)
+	}
 }
 
-func (t *torrentModule) Create(name string) (afero.File, error) {
-	return &file{}, nil
-}
-
-func (t *torrentModule) Open(name string) (afero.File, error) {
-	return &file{}, nil
-}
-
-func (t *torrentModule) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
-	return t.Open(name)
-}
-
-func (t *torrentModule) Mkdir(name string, perm os.FileMode) error {
-	return errors.New("not supported yet")
-}
-
-func (t *torrentModule) MkdirAll(path string, perm os.FileMode) error {
-	return errors.New("not supported yet")
-}
-
-func (t *torrentModule) Remove(name string) error {
-	return errors.New("not supported yet")
-}
-
-func (t *torrentModule) RemoveAll(path string) error {
-	return errors.New("not supported yet")
-}
-
-func (t *torrentModule) Rename(oldname, newname string) error {
-	return errors.New("not supported yet")
-}
-
-func (t *torrentModule) Stat(name string) (os.FileInfo, error) {
-	return nil, errors.New("not supported yet")
-}
-
-func (t *torrentModule) Chmod(name string, mode os.FileMode) error {
-	return errors.New("not supported yet")
-}
-
-func (t *torrentModule) Chtimes(name string, atime time.Time, mtime time.Time) error {
-	return errors.New("not supported yet")
+func (t *torrentModule) sync() fs.Node {
+	torrents := &fs.BaseNode{BaseInfo: fs.BaseInfo{IsDir: true}}
+	for _, t := range t.client.Torrents() {
+		tnode := torrentToNode(t)
+		torrents.Upsert(tnode.Name(), tnode)
+	}
+	return torrents
 }
 
 func logf(format string, args ...interface{}) {

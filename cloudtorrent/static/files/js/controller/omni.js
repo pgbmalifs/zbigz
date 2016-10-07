@@ -1,9 +1,16 @@
 /* globals app,window */
 
 app.controller("OmniController", function($scope, $rootScope, storage, api, search) {
+
+  //modes
+  var TORRENT = $scope.TORRENT = "TORRENT";
+  var MAGNET = $scope.MAGNET = "MAGNET";
+  var SEARCH = $scope.SEARCH = "SEARCH";
+
+
   $rootScope.omni = $scope;
   $scope.inputs = {
-    omni: storage.tcOmni || "",
+    omni: storage.tcOmni || "https://extratorrent.cc/download/4356290/J.+K.+Rowling+-+Harry+Potter+Series+%5BEbook+-+Eng%5D+%5B+%5D.torrent",
     provider: storage.tcProvider || "tpb"
   };
   //edit fields
@@ -30,11 +37,11 @@ app.controller("OmniController", function($scope, $rootScope, storage, api, sear
   });
 
   var parseTorrent = function() {
-    $scope.mode.torrent = true;
+    $scope.mode = TORRENT;
   };
 
   var parseMagnet = function(params) {
-    $scope.mode.magnet = true;
+    $scope.mode = MAGNET;
     var m = window.queryString.parse(params);
 
     if (!/^urn:btih:([A-Za-z0-9]+)$/.test(m.xt)) {
@@ -60,7 +67,7 @@ app.controller("OmniController", function($scope, $rootScope, storage, api, sear
   };
 
   var parseSearch = function() {
-    $scope.mode.search = true;
+    $scope.mode = SEARCH;
     while ($scope.results.length)
       $scope.results.pop();
   };
@@ -118,25 +125,22 @@ app.controller("OmniController", function($scope, $rootScope, storage, api, sear
   };
 
   $scope.submitOmni = function() {
-    if($scope.mode.search) {
-      $scope.submitSearch();
-    } else {
+    switch($scope.mode) {
+    case TORRENT:
       $scope.submitTorrent();
-    }
-  };
-
-  $scope.submitTorrent = function() {
-    if($scope.mode.torrent) {
-      api.url($scope.inputs.omni);
-    } else if($scope.mode.magnet) {
-      api.magnet($scope.inputs.omni);
-    } else {
+      break;
+    case MAGENT:
+      $scope.submitMagnet();
+      break;
+    case SEARCH:
+      $scope.submitSearch();
+      break;
+    default:
       window.alert("UI Bug");
     }
   };
 
   $scope.submitSearch = function() {
-
     //lookup provider's origin
     var provider = $scope.state.SearchProviders[$scope.inputs.provider];
     if(!provider) return;

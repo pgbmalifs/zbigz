@@ -13,6 +13,7 @@ import (
 	"goji.io/pat"
 	"golang.org/x/net/context"
 
+	"github.com/jpillora/cloud-torrent/cloudtorrent/util"
 	"github.com/jpillora/gziphandler"
 	"github.com/jpillora/requestlog"
 	"github.com/jpillora/velox"
@@ -42,10 +43,10 @@ func (a *App) routes() http.Handler {
 		fmt.Fprintf(w, "hello\n")
 	})
 	mux.Handle(pat.Get("/search/*"), a.scraperh)
-	mux.Handle(pat.Post("/api/configure"), errhand(a.handleConfigure))
+	mux.Handle(&util.PrefixPattern{Prefix: "/module/"}, util.ErrHandler(a.handleModule))
+	mux.Handle(pat.Post("/api/configure"), util.ErrHandler(a.handleConfigure))
 	mux.Handle(pat.Get("/js/velox.js"), velox.JS)
 	mux.HandleFunc(pat.Get("/*"), func(w http.ResponseWriter, r *http.Request) {
-		// log.Printf("fallback handle: %s %s", r.Method, r.URL)
 		a.static.ServeHTTP(w, r)
 	})
 	return mux
@@ -86,10 +87,28 @@ func (a *App) handleConfigure(ctx context.Context, w http.ResponseWriter, r *htt
 	return nil
 }
 
-func errhand(fn func(ctx context.Context, w http.ResponseWriter, r *http.Request) error) goji.HandlerFunc {
-	return goji.HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-		if err := fn(ctx, w, r); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+func (a *App) handleModule(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	path := strings.TrimPrefix(r.URL.Path, "/module/")
+	r.URL.Path = "/"
+	i := strings.Index(path, "/")
+	typeID := ""
+	if i == -1 {
+		typeID = path
+	} else {
+		typeID = path[:i]
+		if i < len(path) {
+			r.URL.Path = path[i:]
 		}
-	})
+	}
+	m, ok := a.modules[typeID]
+	if !ok {
+		return errors.New("Invalid module: " + typeID)
+	}
+	h, ok := m.(http.Handler)
+	if !ok {
+		return errors.New("Invalid handler: " + typeID)
+	}
+	log.Printf("module request [%s] %s %s", typeID, r.Method, r.URL)
+	h.ServeHTTP(w, r)
+	return nil
 }

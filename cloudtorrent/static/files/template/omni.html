@@ -44,8 +44,8 @@
     ng-change="parse()"
     ng-enter="submitOmni()"/>
   <i class="icon"
-    ng-class="{search: mode.search, magnet: mode.magnet || mode.torrent,
-          help: !mode.search && !mode.magnet && !mode.torrent}"></i>
+    ng-class="{search: mode == SEARCH, magnet: mode == MAGNET || mode == TORRENT,
+          help: !mode}"></i>
 </div>
 
 <!-- MAGNET FIELD ERROR -->
@@ -54,11 +54,11 @@
 </div>
 
 <!-- START TORRENT BUTTONS -->
-<div class="search buttons" ng-show="mode.torrent">
+<div class="search buttons" ng-show="mode == TORRENT">
   <div ng-click="submitTorrent()"
     class="ui tiny blue button"
     ng-class="{loading: apiing, disabled: apiing }">
-    <span ng-show="mode.torrent">Start Torrent</span>
+    <span>Start Torrent</span>
   </div>
 </div>
 
@@ -112,14 +112,13 @@
 </div>
 
 <!-- MAGNET BUTTONS -->
-<div class="magnet buttons" ng-show="mode.magnet">
+<div class="magnet buttons" ng-show="mode == MAGNET">
   <div ng-click="submitTorrent()"
     class="ui tiny blue button"
     ng-class="{loading: apiing}">
     Load Magnet
   </div>
-  <div ng-show="mode.magnet"
-    ng-click="edit = !edit"
+  <div ng-click="edit = !edit"
     ng-class="{green: edit}"
     class="ui tiny button">Edit</div>
 </div>

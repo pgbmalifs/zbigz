@@ -65,4 +65,14 @@ app.run(function($rootScope, search, api) {
   $scope.withHrs = function(t, hrs) {
     return $scope.agoHrs(t) <= hrs;
   };
+
+  $scope.modules = function(type) {
+    var ms = [];
+    for(var typeid in $scope.state.Modules) {
+      if(!type || typeid.indexOf(type) === 0) {
+        ms.push($scope.state.Modules[typeid]);
+      }
+    }
+    return ms;
+  };
 });

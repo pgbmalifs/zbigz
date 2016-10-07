@@ -103,6 +103,17 @@ footer:hover {
 	text-align: center;
 }
 
+.app .config .module.header {
+	position: relative;
+}
+
+.app .config .module.header .add.button {
+	position: absolute;
+	padding: 4px 0px 4px 9px;
+	right: 0;
+	top: 0;
+}
+
 .torrents-header {
 	margin-top: 20px;
 	position: relative;

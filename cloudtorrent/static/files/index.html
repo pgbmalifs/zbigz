@@ -1,6 +1,6 @@
 <html ng-app="app" >
 	<head>
-		<title ng-bind="state.AppConfig.Title">Cloud Torrent</title>
+		<title ng-bind="state.Modules.app.Config.Title">Cloud Torrent</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<link rel="stylesheet" type="text/css" href="css/Lato/Lato.css">
 		<link rel="stylesheet" type="text/css" href="css/semantic.min.css">
@@ -28,7 +28,7 @@
 					ng-init="logoHover = false"
 					ng-mouseover="logoHover = true"
 					ng-mouseleave="logoHover = false">
-					<i class="blue icon" ng-class="{cloud:!logoHover, github: logoHover}"></i>  {{ logoHover ? 'Cloud Torrent' : state.AppConfig.Title }}
+					<i class="blue icon" ng-class="{cloud:!logoHover, github: logoHover}"></i>  {{ logoHover ? 'Cloud Torrent' : state.Modules.app.Config.Title }}
 				</a>
 			</h2>
 			<div class="status">
@@ -58,8 +58,10 @@
 				<section class="omni" ng-controller="OmniController" ng-include src="'template/omni.html'"></section>
 				<!--
 				<section class="torrents" ng-controller="TorrentsController" ng-include src="'template/torrents.html'"></section>
-				<section class="downloads" ng-controller="DownloadsController" ng-include src="'template/downloads.html'"></section>
-				  -->
+				-->
+				<div ng-repeat="disk in modules('disk')">
+					<section class="downloads" ng-controller="DiskController" ng-include src="'template/downloads.html'"></section>
+				</div>
 			</screen>
 			<!-- TODO rss feed editor screen -->
 		</screens>
@@ -75,12 +77,13 @@
 		<script src="js/vendor/moment.min.js"></script>
 		<script src="js/velox.js"></script>
 		<script>window.app = window.angular.module('app', []);</script>
-		<script src="js/config-controller.js"></script>
-		<script src="js/omni-controller.js"></script>
-		<script src="js/torrents-controller.js"></script>
-		<script src="js/downloads-controller.js"></script>
-		<script src="js/utils.js"></script>
-		<script src="js/semantic-checkbox.js"></script>
+		<script src="js/controller/config.js"></script>
+		<script src="js/controller/omni.js"></script>
+		<script src="js/controller/torrents.js"></script>
+		<script src="js/controller/disk.js"></script>
+		<script src="js/directives.js"></script>
+		<script src="js/filters.js"></script>
+		<script src="js/services.js"></script>
 		<script src="js/run.js"></script>
 	</div></body>
 </html>

@@ -15,7 +15,7 @@ import (
 type State struct {
 	sync.Locker  `json:"-"`
 	velox.Pusher `json:"-"`
-	TypeID       string         `json:"typeid"`
+	TypeID       string
 	Enabled      bool           `json:",omitempty"`
 	Syncing      bool           `json:",omitempty"`
 	Config       interface{}    `json:",omitempty"`
@@ -24,16 +24,22 @@ type State struct {
 }
 
 //Sync runs once after the first
-//successful configure, then loops fs.Sync()
+//successful configure, then loops the module's Sync()
 //forever, with exponential backoff on failures.
-func (s *State) Sync(f fs.FS) {
-	name := "fs"
+func (s *State) Sync(m Module) {
+	typeid := m.TypeID()
+	if f, ok := m.(fs.FS); ok {
+		s.syncFS(typeid, f)
+	}
+}
+
+func (s *State) syncFS(typeid string, f fs.FS) {
 	updates := make(chan fs.Node)
-	//monitor and sync updates
+	//monitor sync updates
 	go func() {
 		for node := range updates {
 			s.Lock()
-			log.Printf("[%s] updated", name)
+			// log.Printf("[%s] fs root updated", typeid)
 			s.Root = node
 			s.Unlock()
 			s.Push()
@@ -41,16 +47,16 @@ func (s *State) Sync(f fs.FS) {
 	}()
 	//sync loop forever
 	go func() {
-		b := backoff.Backoff{Max: 2 * time.Minute}
+		b := backoff.Backoff{Max: 5 * time.Minute}
 		for {
 			//retrieve updates
 			err := f.Sync(updates)
 			e := ""
-			d := 30 * time.Second
+			d := 1 * time.Second
 			if err == nil {
 				b.Reset()
 			} else {
-				log.Printf("[%s] sync failed: %s", name, err)
+				log.Printf("[%s] fs sync failed: %s", typeid, err)
 				e = err.Error()
 				d = b.Duration()
 			}
@@ -63,5 +69,5 @@ func (s *State) Sync(f fs.FS) {
 			time.Sleep(d)
 		}
 	}()
-	log.Printf("[%s] Sync started", name)
+	log.Printf("[%s] syncing fs", typeid)
 }
